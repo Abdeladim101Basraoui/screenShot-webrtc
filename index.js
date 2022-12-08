@@ -1,78 +1,122 @@
 (() => {
-  //
-  const width = 320;
-  let hight = 0;
+  const width = 320; // We will scale the photo width to this
+  let height = 0; // This will be computed based on the input stream
 
   let streaming = false;
+
+  // The various HTML elements we need to configure or control. These
+  // will be set by the startup() function.
 
   let video = null;
   let canvas = null;
   let photo = null;
   let startbutton = null;
 
-  //
-  function showViewResultButton() {
+  function showViewLiveResultButton() {
     if (window.self !== window.top) {
+      // Ensure that if our document is in a frame, we get the user
+      // to first open it in its own tab or window. Otherwise, it
+      // won't be able to request permission for camera access.
       document.querySelector(".contentarea").remove();
       const button = document.createElement("button");
-      button.textContent = document.body.append(button);
-
+      button.textContent = "View live result of the example code above";
+      document.body.append(button);
       button.addEventListener("click", () => window.open(location.href));
       return true;
     }
     return false;
   }
-  //
-  function startUp() {
+
+  const getConnectedDevices = async (type) => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(
+      (device) => device.kind === type && !device.label.includes("HD")
+    );
+  };
+
+  function startup() {
+    if (showViewLiveResultButton()) {
+      return;
+    }
+
+    devicelist = document.getElementById("inside");
     video = document.getElementById("video");
     canvas = document.getElementById("canvas");
     photo = document.getElementById("photo");
-    startButton = document.getElementById("startButton");
+    startbutton = document.getElementById("startbutton");
 
-    //get mediastream
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
-      .then(function (stream) {
-        video.srcObject = stream;
-        video.play();
-      })
-      .catch((err) => {
-        console.log(`get the stream error ${err}`);
+    getConnectedDevices("videoinput").then((devices) => {
+      //list the connected devices
+      devices.forEach((device) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label;
+        devicelist.appendChild(option);
       });
+
+      //listen for the change event
+      devicelist.addEventListener("change", (event) => {
+        navigator.mediaDevices
+          .getUserMedia({
+            video: {
+              deviceId: {
+                exact: event.target.value,
+              },
+            },
+            audio: false,
+          })
+          .then((stream) => {
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch((err) => {
+            console.error(`An error occurred: ${err}`);
+          });
+      });
+    });
+
+    //
 
     video.addEventListener(
       "canplay",
-      function (ev) {
+      (ev) => {
         if (!streaming) {
-          hight = video.videoHeight / (video.videoWidth / width);
-          if (isNaN(hight)) {
-            hight = width / (4 / 3);
+          height = video.videoHeight / (video.videoWidth / width);
+
+          // Firefox currently has a bug where the height can't be read from
+          // the video, so we will make assumptions if this happens.
+
+          if (isNaN(height)) {
+            height = width / (4 / 3);
           }
+
           video.setAttribute("width", width);
-          video.setAttribute("height", hight);
+          video.setAttribute("height", height);
           canvas.setAttribute("width", width);
-          canvas.setAttribute("height", hight);
+          canvas.setAttribute("height", height);
           streaming = true;
         }
       },
       false
     );
 
-    startButton.addEventListener(
+    startbutton.addEventListener(
       "click",
       (ev) => {
-        takePicture();
+        takepicture();
         ev.preventDefault();
       },
       false
     );
 
-    clearPhoto();
+    clearphoto();
   }
 
-  function clearPhoto() {
-    const context = canvas.getContext("2d");
+  // Fill the photo with an indication that none has been
+  // captured.
 
+  function clearphoto() {
+    const context = canvas.getContext("2d");
     context.fillStyle = "#AAA";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -80,19 +124,23 @@
     photo.setAttribute("src", data);
   }
 
-  function takePicture() {
+
+
+  function takepicture() {
     const context = canvas.getContext("2d");
-    if (width && hight) {
+    if (width && height) {
       canvas.width = width;
-      canvas.height = hight;
-      context.drawImage(video, 0, 0, width, hight);
+      canvas.height = height;
+      context.drawImage(video, 0, 0, width, height);
 
       const data = canvas.toDataURL("image/png");
       photo.setAttribute("src", data);
     } else {
-      clearPhoto();
+      clearphoto();
     }
   }
 
-  window.addEventListener("load", startUp, false);
+  // Set up our event listener to run the startup process
+  // once loading is complete.
+  window.addEventListener("load", startup, false);
 })();
