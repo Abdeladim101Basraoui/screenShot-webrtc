@@ -4,6 +4,11 @@
 
   let streaming = false;
 
+  //the readed devices
+  let readedDevices = [];
+
+  let devicelist = document.getElementById("inside");
+
   // The various HTML elements we need to configure or control. These
   // will be set by the startup() function.
 
@@ -27,6 +32,7 @@
     return false;
   }
 
+  //get connected devices
   const getConnectedDevices = async (type) => {
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices.filter(
@@ -39,43 +45,12 @@
       return;
     }
 
-    devicelist = document.getElementById("inside");
     video = document.getElementById("video");
     canvas = document.getElementById("canvas");
     photo = document.getElementById("photo");
     startbutton = document.getElementById("startbutton");
 
-    getConnectedDevices("videoinput").then((devices) => {
-      //list the connected devices
-      devices.forEach((device) => {
-        const option = document.createElement("option");
-        option.value = device.deviceId;
-        option.text = device.label;
-        devicelist.appendChild(option);
-      });
-
-      //listen for the change event
-      devicelist.addEventListener("change", (event) => {
-        navigator.mediaDevices
-          .getUserMedia({
-            video: {
-              deviceId: {
-                exact: event.target.value,
-              },
-            },
-            audio: false,
-          })
-          .then((stream) => {
-            video.srcObject = stream;
-            video.play();
-          })
-          .catch((err) => {
-            console.error(`An error occurred: ${err}`);
-          });
-      });
-    });
-
-    //
+    readAndUpdateDevice();
 
     video.addEventListener(
       "canplay",
@@ -110,7 +85,58 @@
     );
 
     clearphoto();
+
+    navigator.mediaDevices.ondevicechange = () => {
+      updateList();
+      console.log("device change");
+    };
   }
+
+  const readAndUpdateDevice = () => {
+    updateDeviceTable();
+    devicelist.addEventListener("change", (event) => {
+      navigator.mediaDevices
+        .getUserMedia({
+          video: {
+            deviceId: {
+              exact: event.target.value,
+            },
+          },
+          audio: false,
+        })
+        .then((stream) => {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch((err) => {
+          console.error(`An error occurred: ${err}`);
+        });
+    });
+  };
+
+  updateDeviceTable = () => {
+    getConnectedDevices("videoinput").then((devices) => {
+      readedDevices = devices;
+      console.table(readedDevices);
+
+      //listen for the change event
+      updateList();
+    });
+  };
+  const updateList = () => {
+    updateDeviceTable();
+    readedDevices.forEach((device) => {
+      // //remove old options exept the first one
+      while (devicelist.options.length > 1) {
+        devicelist.remove(1);
+      }
+
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.text = device.label;
+      devicelist.appendChild(option);
+    });
+  };
 
   // Fill the photo with an indication that none has been
   // captured.
@@ -123,8 +149,6 @@
     const data = canvas.toDataURL("image/png");
     photo.setAttribute("src", data);
   }
-
-
 
   function takepicture() {
     const context = canvas.getContext("2d");
