@@ -126,34 +126,67 @@ import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
     if (drawCanva === undefined) {
       newCanva = document.createElement("canvas");
       newContext = newCanva.getContext("2d");
-    } else 
-    {
+    } else {
       newCanva = canvas;
       newContext = newCanva.getContext("2d");
     }
     if (width && height) {
       newCanva.width = width;
       newCanva.height = height;
+      newCanva.addEventListener("click", () => {
+        download();
+      });
       newContext.drawImage(video, 0, 0, width, height);
-
+      Scaling(width, height);
       const data = newCanva.toDataURL("image/png");
 
-      newCanva.toBlob((blob) => {
-        file = new File([blob], "fileName.jpg", { type: "image/jpeg" });
-      
-        console.log("FILE blob", file);
+      if (drawCanva === undefined) {
+        newCanva.toBlob((blob) => {
+          file = new File([blob], "fileName.jpg", { type: "image/jpeg" });
 
-        console.log("file socket", file);
-        socket.emit("theImage", { client: socket.id, data: file });
+          console.log("FILE blob", file);
 
-        // return file;
-      }, "image/jpeg");
+          console.log("file socket", file);
+          socket.emit("theImage", { client: socket.id, data: file });
+          return file;
+        }, "image/jpeg");
+      }
     } else {
       clearphoto();
     }
   }
+  const download = () => {
+    var link = document.createElement("a");
+    link.download = "filename.png";
+    link.href = document.getElementById("canvas").toDataURL();
+    link.click();
+  };
+
+  const Scaling = (width, height) => {
+    // Get the dimensions of the image in pixels
+    // var width = 800; // replace with the actual width of the image
+    // var height = 600; // replace with the actual height of the image
+
+    // Get the real-world dimensions of an object in the image
+    var objectSize = 25; // replace with the actual size of the object in millimeters
+
+    // Get the resolution of the display or the printer
+    var dpi = 72; // replace with the actual dpi of your device
+
+    // Calculate the pixel size of the image
+    var pixelSize = 25.4 / dpi; // 25.4 mm per inch
+
+    // Calculate the scale of the image
+    var scale = objectSize / (pixelSize * Math.max(width, height));
+
+    // Print the scale to the console
+    console.log("Scale:", scale);
+  };
   window.addEventListener("load", startup, false);
 
+  /*****************************************
+  // back-end
+  /******************************************/
   const socket = io("http://localhost:3000/shot");
   socket.on("connect", () => {
     console.log("connected");
@@ -180,9 +213,8 @@ import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
     console.log("data", data);
     const blob = new Blob([data.data], { type: "image/jpeg" });
     //file to base64
-    // const photo = document.getElementById("photo");
-   takepicture(data.data);
-
+    const photo = document.getElementById("photo");
+    takepicture(data.data);
   });
   socket.on("disconnect", () => {
     console.log("disconnected");
